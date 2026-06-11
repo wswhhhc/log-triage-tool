@@ -1,10 +1,34 @@
 # 日志异常分诊工具
 
-## 项目简介
+轻量级日志异常分诊 MVP，用于从多来源、字段不统一、包含脏数据的日志中识别异常、合并同一根因问题、计算优先级、给出处理建议，并判断哪些问题需要人工介入。
 
-一个轻量级日志异常分诊 MVP，能够自动读取 JSONL 格式日志文件，识别异常、合并同一根因的重复异常、生成优先级排序、提供处理建议，并判断哪些问题需要人工介入。
+![CI](https://github.com/wswhhhc/log-triage-tool/actions/workflows/ci.yml/badge.svg)
 
-项目自带样例数据 `data/sample_logs.jsonl`，共 54 行日志，覆盖 11 个来源系统，包含字段不一致、时间乱序、脏数据、中英文混杂、动态 ID 和未知错误等场景。
+## 功能概览
+
+- 读取 JSONL 日志文件，容错处理无效 JSON 行
+- 标准化不同来源的字段名，例如 `timestamp/time/created_at`、`service/source/app/system`
+- 识别异常日志，包括错误等级、异常关键词和严重脏数据
+- 基于 fingerprint 合并同一根因异常
+- 按多因素评分生成 P0/P1/P2/P3 优先级
+- 给出处理建议，并判断是否需要人工介入
+- 支持异常状态更新：`open`、`investigating`、`mitigated`、`resolved`、`ignored`
+- 提供 Web 页面、统计卡片、异常详情和上传入口
+- 使用 pytest 覆盖核心判断逻辑，并配置 GitHub Actions CI
+
+## 样例数据
+
+项目自带主样例：
+
+- `data/sample_logs.jsonl`
+- 共 54 行日志
+- 覆盖 11 个来源系统
+- 包含字段不一致、时间乱序、脏数据、中英文混杂、动态 ID、重复失败和未知错误
+
+另提供一个较小的上传测试文件：
+
+- `data/upload_test_logs.jsonl`
+- 用于快速验证页面上传和重新分析功能
 
 ## 快速开始
 
@@ -14,25 +38,35 @@
 pip install -r requirements.txt
 ```
 
-### 2. 启动项目
+### 2. 启动服务
 
 ```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3. 访问页面
+### 3. 打开页面
 
-打开浏览器访问 `http://localhost:8000`，页面会自动加载并展示异常分诊结果。
+访问：
 
-### 4. 使用自定义日志
-
-页面支持上传 `.jsonl`、`.json` 或 `.log` 文件，上传后会重新执行完整分析流程。也可以直接调用接口：
-
-```bash
-curl -X POST "http://localhost:8000/api/upload" -F "file=@data/sample_logs.jsonl"
+```text
+http://localhost:8000
 ```
 
-上传或重新处理日志时，系统会先清空上一次分析结果，避免旧数据残留影响统计。
+启动后系统会自动读取 `data/sample_logs.jsonl` 并展示分析结果。
+
+## 上传自定义日志
+
+页面支持上传 `.jsonl`、`.json` 或 `.log` 文件。上传后系统会清空上一次分析结果，并重新执行完整流程：
+
+```text
+解析 -> 标准化 -> 异常识别 -> 分类 -> 合并 -> 优先级 -> 建议 -> 统计
+```
+
+也可以通过 API 上传：
+
+```bash
+curl -X POST "http://localhost:8000/api/upload" -F "file=@data/upload_test_logs.jsonl"
+```
 
 ## 运行测试
 
@@ -40,103 +74,119 @@ curl -X POST "http://localhost:8000/api/upload" -F "file=@data/sample_logs.jsonl
 pytest tests/ -v
 ```
 
-## 设计说明
+当前测试覆盖 40 个用例，重点验证核心判断逻辑，而不是只测试页面是否渲染。
 
-### 如何定义"同一个异常"
+GitHub Actions CI 会在 push 和 pull request 时自动运行同一组测试。
 
-同一个异常通过 **fingerprint（指纹）** 来判定。指纹由三部分组成：
+## API 简介
 
-```
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `GET` | `/` | Web 页面 |
+| `GET` | `/api/issues` | 获取异常问题列表 |
+| `GET` | `/api/issues/{issue_id}` | 获取异常详情 |
+| `PUT` | `/api/issues/{issue_id}/status?status=resolved` | 更新异常状态 |
+| `GET` | `/api/stats` | 获取整体统计 |
+| `POST` | `/api/upload` | 上传日志文件并重新分析 |
+
+## 核心设计
+
+### 如何定义“同一个异常”
+
+同一个异常通过 fingerprint 判定：
+
+```text
 fingerprint = MD5(来源系统 | 异常类型 | 标准化消息模板)
 ```
 
-其中**标准化消息模板**的处理分为两步：
+标准化消息模板包括两步处理：
 
-1. **去除动态内容**：订单号（`ORD-88271`）、UUID、IP 地址、用户 ID、时间戳、金额、batch ID 等替换为占位符（如 `<ORDER_ID>`、`<IP>`）
-2. **同义词归一化**：中英文同义词映射到同一标准词，如 `timeout/超时/timed out → TIMEOUT`、`database/数据库/db → DATABASE`
+1. 去除动态内容：订单号、UUID、IP、用户 ID、时间戳、金额、batch ID 等会被替换为占位符。
+2. 同义词归一化：例如 `timeout/超时/timed out -> timeout`，`database/数据库/db -> database`。
 
-这样，同一来源、同一根因的异常（即使包含不同订单号、不同语言的表述）会生成相同的 fingerprint，从而实现合并。
+这样，同一来源、同一根因的异常即使包含不同订单号或中英文不同表述，也能生成相同 fingerprint。
 
 ### 如何做异常分类
 
-基于关键词匹配 + 优先规则，按以下顺序依次匹配：
+分类基于关键词匹配和优先顺序：
 
-| 优先级 | 类型 | 匹配关键词 |
-|--------|------|-----------|
-| 最高 | TIMEOUT | timeout、超时、timed out |
-| 高 | AUTH | auth、认证、token、permission、权限 |
-| 高 | DATABASE | database、数据库、db、sql、mysql、redis |
-| 中 | NETWORK | network、网络、connection refused、dns、tcp |
-| 中 | VALIDATION | validation、校验、invalid、required、必填 |
-| 低 | RESOURCE_LIMIT | limit、限流、throttle、quota、过载 |
-| 最低 | DATA_QUALITY | 脏数据、字段缺失 |
-| 兜底 | UNKNOWN | 以上都不匹配 |
+| 类型 | 示例关键词 |
+|------|------------|
+| `TIMEOUT` | timeout、超时、timed out |
+| `AUTH` | auth、认证、token、permission、权限 |
+| `DATABASE` | database、数据库、db、sql、mysql、redis |
+| `NETWORK` | network、网络、connection refused、dns、tcp |
+| `VALIDATION` | validation、校验、invalid、required、必填 |
+| `RESOURCE_LIMIT` | limit、限流、throttle、quota、过载 |
+| `DATA_QUALITY` | 可解析但缺少关键字段的脏数据 |
+| `UNKNOWN` | 无法匹配到已知规则的问题 |
 
-**分类优先级规则**：先匹配到的优先。例如一条日志同时包含 "timeout" 和 "database"，归为 TIMEOUT 而非 DATABASE。
+当一条日志同时命中多个类型时，按规则顺序优先匹配。例如同时包含 `timeout` 和 `database` 时，归为 `TIMEOUT`。
 
 ### 如何判断优先级
 
-使用**多因素加权评分公式**，满分为 10 分：
+优先级使用多因素加权评分，满分按 10 分量级设计：
 
+```text
+score = 0.30 × severity_score
+      + 0.25 × frequency_score
+      + 0.25 × core_service_bonus
+      + 0.15 × unknown_bonus
+      + 0.05 × data_quality_bonus
+      + time_span_bonus
 ```
-score = 0.30 × severity_score     # 严重程度评分（0-10）
-      + 0.25 × frequency_score    # 重复次数评分（对数缩放，0-10）
-      + 0.25 × core_service_bonus # 核心链路加分（0 或 10）
-      + 0.15 × unknown_bonus      # 未知错误加分（0 或 10）
-      + 0.05 × data_quality_bonus # 数据质量加分（0 或 10）
-      + time_span_bonus           # 持续发生超过1小时额外+1
-```
 
-**阈值映射：**
-- 7.0+ → **P0**（立即处理）
-- 4.0-6.9 → **P1**（尽快处理）
-- 2.0-3.9 → **P2**（正常排队）
-- 0-1.9 → **P3**（低影响）
+阈值：
 
-**核心服务**包括：payment-service、order-worker、auth-gateway、risk-api。
+- `P0`：7.0+，立即处理
+- `P1`：4.0-6.9，尽快处理
+- `P2`：2.0-3.9，正常排队
+- `P3`：0-1.9，低影响
+
+核心服务包括 `payment-service`、`order-worker`、`auth-gateway`、`risk-api`。
 
 ### 如何判断是否需要人工介入
 
-**需要人工介入（满足任一）：**
-- UNKNOWN 类型异常（无法自动分类）
+满足任一条件时需要人工介入：
+
+- `UNKNOWN` 类型异常
 - P0/P1 高优先级问题
 - 同一问题重复超过 5 次
-- P0/P1 问题且涉及核心服务
-- AUTH 类型（涉及认证安全）
+- P0/P1 且涉及核心服务
+- `AUTH` 类型，涉及认证或权限风险
 
-**可自动处理（同时满足）：**
-- 没有以上需要人工的条件
-- 低频 TIMEOUT（发生 ≤ 2 次）
-- 低频 NETWORK 抖动（发生 ≤ 2 次）
-- P3 低优先级
+可自动处理的典型情况：
+
+- 低频 timeout
+- 低频 network 抖动
+- P3 低优先级问题
 
 ### 如何处理脏数据
 
-1. **解析阶段**：无效 JSON 行被捕获并记录行号和内容前 200 字符，程序不崩溃
-2. **标准化阶段**：缺少关键字段（时间戳、消息）被标记为脏数据，记录具体原因
-3. **统计阶段**：脏数据独立统计并在前端展示
-4. **分类阶段**：可解析但字段缺失的日志会进入 DATA_QUALITY 类型；完全无效的 JSON 行只进入脏数据统计，不参与异常合并
+- 无效 JSON 行会被记录为解析阶段脏数据，不会导致程序崩溃。
+- 缺少时间戳或消息等关键字段的日志会被标记为脏数据。
+- 可解析但字段缺失的日志会进入 `DATA_QUALITY` 类型。
+- 完全无效的 JSON 行只进入脏数据统计，不参与异常合并。
 
 ## 技术选型
 
 | 组件 | 选择 | 理由 |
 |------|------|------|
-| 语言 | Python 3 | 快速开发，生态丰富，适合数据处理 |
-| 后端框架 | FastAPI | 原生异步支持，自动 API 文档，部署简单 |
-| 数据存储 | SQLite | 零配置，单文件，适合 MVP 规模 |
-| 输入格式 | JSONL | 逐行处理，流式友好，不要求加载全部到内存 |
-| 测试框架 | pytest | 简洁高效，fixture 灵活 |
-| 前端 | HTML + Fetch API | 无构建步骤，纯静态，功能完整 |
+| 语言 | Python 3 | 适合快速开发和日志数据处理 |
+| 后端框架 | FastAPI | 轻量、启动快、API 实现简单 |
+| 数据存储 | SQLite | 零配置，适合 MVP 和本地演示 |
+| 输入格式 | JSONL | 逐行处理，天然适合日志 |
+| 测试框架 | pytest | 语法简洁，适合业务逻辑单元测试 |
+| 前端 | HTML + Fetch API | 无构建步骤，便于直接运行 |
 
 ## 线上化扩展
 
-如果这是线上系统，还需要补充以下内容：
+如果演进为线上系统，需要补充：
 
-1. **存储**：SQLite → PostgreSQL/ClickHouse，支持高并发和数据持久化
-2. **数据接入**：单文件读取 → 流式 Kafka 消费，支持实时处理
-3. **指纹计算**：建立时间索引和 fingerprint 索引，支持增量更新和滑动窗口
-4. **前端**：需要分页、搜索、过滤、时间范围选择、图表可视化
-5. **配置管理**：分类规则、权重参数配置化和版本管理
-6. **可观测性**：添加处理延迟、吞吐量、准确率等指标和告警
-7. **告警集成**：对接企业微信、钉钉、PagerDuty 等通知渠道
-8. **反馈闭环**：人工标记修正后，反馈到规则库实现自我改进
+1. SQLite 替换为 PostgreSQL、ClickHouse 或 Elasticsearch
+2. 单文件读取改为 Kafka、Filebeat 或 OpenTelemetry 接入
+3. fingerprint 和时间字段建立索引，支持增量合并和滑动窗口
+4. 分类规则、权重、核心服务列表配置化
+5. 增加分页、搜索、过滤、时间范围和图表
+6. 增加告警通知、权限控制和审计日志
+7. 建立人工反馈闭环，用修正结果持续优化规则
