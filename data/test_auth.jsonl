@@ -1,5 +1,0 @@
-{"source":"auth-gateway","level":"error","time":"2024/06/10 12:05:30","msg":"token validation failed for user_id=10001: JWT signature invalid","request_id":"req-abc-001"}
-{"source":"auth-gateway","level":"error","time":"2024/06/10 12:06:00","msg":"用户认证失败: permission denied for user_id=10002 accessing /api/admin"}
-{"source":"auth-gateway","level":"error","time":"2024/06/10 12:15:00","msg":"unauthorized access attempt detected from IP 10.0.0.55, token expired"}
-{"source":"order-worker","level":"error","timestamp":"2024-06-10T14:00:00Z","message":"permission denied: worker cannot access queue order_processing_high"}
-{"source":"order-worker","level":"error","timestamp":"2024-06-10T14:01:00Z","message":"无权限访问: 订单队列 order_processing_low 认证失败"}

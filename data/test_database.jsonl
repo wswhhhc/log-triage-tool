@@ -1,4 +1,0 @@
-{"source":"order-worker","level":"fatal","timestamp":"2024-06-10T10:00:00Z","message":"database is unavailable after 3 retries for transaction TX-20001, cannot be committed","trace_id":"x1y2z3-abc"}
-{"source":"order-worker","level":"error","timestamp":"2024-06-10T10:01:00Z","message":"数据库不可用: 事务 TX-20002 提交失败, 连接池已耗尽"}
-{"source":"payment-service","level":"error","timestamp":"2024-06-10T10:05:00Z","message":"database query failed: connection pool exhausted for pool size=10, active=10"}
-{"source":"inventory-service","level":"error","timestamp":"2024-06-10T11:00:00Z","message":"mysql connection lost: server has gone away"}

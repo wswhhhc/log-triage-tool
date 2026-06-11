@@ -1,6 +1,0 @@
-{"source":"etl-job","level":"debug","timestamp":"2024-06-10T10:00:00Z","message":"Payment processed OK: order_id=ORD-40001","job_name":"process_payment"}
-{"source":"order-worker","level":"info","timestamp":"2024-06-10T10:01:00Z","message":"订单 ORD-40002 创建成功"}
-{"source":"auth-gateway","level":"info","timestamp":"2024-06-10T11:00:00Z","message":"user_id=10003 login successful"}
-{"source":"inventory-service","level":"info","timestamp":"2024-06-10T12:00:00Z","message":"库存同步完成: batch_id=5001"}
-{"source":"risk-api","level":"info","timestamp":"2024-06-10T13:00:00Z","message":"risk check passed for transaction TX-30001"}
-{"source":"search-service","level":"info","timestamp":"2024-06-10T14:00:00Z","message":"search index rebuilt: index=products, docs=50000"}
