@@ -127,7 +127,15 @@ def get_all_issues() -> List[dict]:
     c.execute("SELECT * FROM issues ORDER BY priority, occurrence_count DESC")
     rows = c.fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    result = []
+    for r in rows:
+        d = dict(r)
+        if isinstance(d.get("related_log_ids"), str):
+            d["related_log_ids"] = json.loads(d["related_log_ids"])
+        if isinstance(d.get("needs_human"), bool):
+            d["needs_human"] = int(d["needs_human"])
+        result.append(d)
+    return result
 
 
 def get_stats() -> Dict:
