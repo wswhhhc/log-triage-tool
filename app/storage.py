@@ -29,7 +29,8 @@ def init_db():
             trace_id TEXT,
             raw TEXT,
             is_dirty INTEGER,
-            dirty_reason TEXT
+            dirty_reason TEXT,
+            is_anomaly INTEGER DEFAULT 0
         )
     """)
 
@@ -57,13 +58,23 @@ def init_db():
     conn.close()
 
 
+def clear_all():
+    """清空所有数据"""
+    conn = get_conn()
+    c = conn.cursor()
+    c.execute("DELETE FROM logs")
+    c.execute("DELETE FROM issues")
+    conn.commit()
+    conn.close()
+
+
 def save_logs(logs: List[LogEntry]):
     """保存标准化日志"""
     conn = get_conn()
     c = conn.cursor()
     for log in logs:
         c.execute(
-            "INSERT OR REPLACE INTO logs VALUES (?,?,?,?,?,?,?,?,?,?)",
+            "INSERT OR REPLACE INTO logs VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 log.id,
                 str(log.timestamp) if log.timestamp else None,
@@ -75,6 +86,7 @@ def save_logs(logs: List[LogEntry]):
                 json.dumps(log.raw, ensure_ascii=False),
                 int(log.is_dirty),
                 log.dirty_reason,
+                int(log.is_anomaly) if hasattr(log, 'is_anomaly') else 0,
             ),
         )
     conn.commit()
@@ -149,7 +161,7 @@ def get_stats() -> Dict:
     dirty = c.execute(
         "SELECT COUNT(*) FROM logs WHERE is_dirty = 1").fetchone()[0]
     anomaly = c.execute(
-        "SELECT COUNT(*) FROM logs WHERE level IN ('error','fatal','critical')"
+        "SELECT COUNT(*) FROM logs WHERE is_anomaly = 1"
     ).fetchone()[0]
     merged = c.execute("SELECT COUNT(*) FROM issues").fetchone()[0]
 

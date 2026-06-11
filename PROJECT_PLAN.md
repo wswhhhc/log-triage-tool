@@ -126,6 +126,7 @@ class LogEntry:
     raw: dict = field(default_factory=dict)
     is_dirty: bool = False
     dirty_reason: Optional[str] = None
+    is_anomaly: bool = False
 
 @dataclass
 class AnomalyIssue:
@@ -413,12 +414,23 @@ DYNAMIC_PATTERNS = [
     (re.compile(r'\d{4}[-/]\d{2}[-/]\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?'), '<DATETIME>'),
     # IP 地址
     (re.compile(r'\b(?:\d{1,3}\.){3}\d{1,3}\b'), '<IP>'),
-    # 订单号（常见格式）
-    (re.compile(r'order[_-]?\d+', re.I), '<ORDER_ID>'),
+    # 订单号（多种格式）
+    (re.compile(r'\border[_-]?id[=:]\s*\S+', re.I), '<ORDER_ID>'),
+    (re.compile(r'\b(?:ORD|TX|TXN|SKU)[_-]?\d+\b', re.I), '<ORDER_ID>'),
+    (re.compile(r'\border[=:]\s*\d+\b', re.I), '<ORDER_ID>'),
     # 用户ID
     (re.compile(r'user[_-]?\d+', re.I), '<USER_ID>'),
+    # Batch ID
+    (re.compile(r'\bbatch[_\s]\d+\b', re.I), '<BATCH_ID>'),
+    (re.compile(r'\bbatch\s+\d+\b', re.I), '<BATCH_ID>'),
     # 纯数字ID（长数字）
     (re.compile(r'\b\d{6,}\b'), '<NUM_ID>'),
+    # 等号后面的数值
+    (re.compile(r'(?<==)\d+(?:\s*ms)?\b'), '<NUM>'),
+    # 持续时间
+    (re.compile(r'\b\d+(?:\s*ms)\b'), '<DURATION>'),
+    # 重试标识
+    (re.compile(r'\bretry\s+\d+/\d+\b', re.I), 'retry <N>/<N>'),
     # trace_id 后的值
     (re.compile(r'trace[_-]?id[=:]\s*\S+', re.I), 'trace_id=<TRACE_ID>'),
     # 金额
@@ -530,9 +542,9 @@ CORE_SERVICES = {"payment-service", "order-worker", "auth-gateway", "risk-api"}
 WEIGHTS = {
     "severity": 0.30,     # 严重程度
     "frequency": 0.25,    # 重复次数
-    "core_service": 0.20, # 核心业务链路
+    "core_service": 0.25, # 核心业务链路
     "unknown": 0.15,      # 未知错误
-    "data_quality": 0.10, # 数据质量
+    "data_quality": 0.05, # 数据质量
 }
 
 def calculate_priority(issue: AnomalyIssue) -> tuple:
@@ -881,6 +893,10 @@ def startup():
 
 def process_logs(file_path: str):
     """完整的处理流水线"""
+    # 0. 清空旧数据
+    from app.storage import clear_all
+    clear_all()
+
     # 1. 解析
     raw_logs, dirty = parse_jsonl(file_path)
     # 注意：dirty 是 parse 阶段的无效 JSON 行，后续统计不能丢。
@@ -889,8 +905,24 @@ def process_logs(file_path: str):
     # 2. 标准化
     entries = [normalize(raw, i) for i, raw in enumerate(raw_logs)]
     
-    # 3. 保存全部日志
-    save_logs(entries)
+    # 将解析阶段的脏数据也记录为脏日志条目（用于统计）
+    parse_dirty_logs = []
+    for d in dirty:
+        entry = normalize({}, -d["line_number"])
+        entry.is_dirty = True
+        entry.dirty_reason = d["reason"]
+        entry.raw = d
+        entry.id = f"parse_dirty_{d['line_number']}"
+        entry.source = "unknown"
+        entry.message = f"__PARSE_ERROR__(line {d['line_number']})"
+        parse_dirty_logs.append(entry)
+    
+    all_entries = entries + parse_dirty_logs
+    
+    # 3. 标记异常并保存全部日志
+    for e in entries:
+        e.is_anomaly = is_anomaly(e)
+    save_logs(all_entries)
     
     # 4. 筛选异常
     anomalies = [e for e in entries if is_anomaly(e)]
@@ -948,6 +980,9 @@ def index():
     """前端页面"""
     with open("static/index.html", "r", encoding="utf-8") as f:
         return f.read()
+
+# 挂载静态文件
+app.mount("/static", StaticFiles(directory="static"), name="static")
 ```
 
 ### 11.2 启动命令

@@ -101,7 +101,7 @@ def normalize(raw: dict, line_index: int) -> LogEntry:
         dirty_reasons.append("缺少时间戳")
     if source is None:
         dirty_reasons.append("缺少来源系统")
-    if message is None:
+    if message is None or (isinstance(message, str) and len(message.strip()) < 3):
         is_dirty = True
         dirty_reasons.append("错误信息缺失或过短")
 

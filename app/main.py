@@ -11,8 +11,8 @@ from app.normalizer import normalize
 from app.parser import parse_jsonl
 from app.prioritizer import calculate_priority
 from app.recommender import get_recommendation, need_human
-from app.storage import (get_all_issues, get_stats, init_db, save_issues,
-                         save_logs, update_issue_status)
+from app.storage import (clear_all, get_all_issues, get_stats, init_db,
+                         save_issues, save_logs, update_issue_status)
 
 app = FastAPI(title="日志异常分诊工具")
 
@@ -27,6 +27,9 @@ def startup():
 
 def process_logs(file_path: str):
     """完整的处理流水线"""
+    # 0. 清空旧数据
+    clear_all()
+
     # 1. 解析
     raw_logs, dirty = parse_jsonl(file_path)
 
@@ -42,8 +45,12 @@ def process_logs(file_path: str):
         entry.raw = d
         entry.id = f"parse_dirty_{d['line_number']}"
         entry.source = "unknown"
-        entry.message = f"解析脏数据(行{d['line_number']}): {d['raw_content'][:100]}"
+        entry.message = f"parse dirty(line {d['line_number']}): {d['raw_content'][:100]}"
         parse_dirty_logs.append(entry)
+
+    # 标记异常日志
+    for e in entries:
+        e.is_anomaly = is_anomaly(e)
 
     all_entries = entries + parse_dirty_logs
 

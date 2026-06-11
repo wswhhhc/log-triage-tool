@@ -53,6 +53,7 @@ class LogEntry:
     raw: dict = field(default_factory=dict)
     is_dirty: bool = False
     dirty_reason: Optional[str] = None
+    is_anomaly: bool = False
 
 
 @dataclass

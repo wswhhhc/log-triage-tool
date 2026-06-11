@@ -37,23 +37,47 @@ SYNONYM_PATTERNS = [
 ]
 
 
+# 停用词 — 归一化后过滤掉，不参与指纹
+STOP_WORDS = {
+    "after", "for", "the", "at", "with", "to", "of", "in", "on", "a", "an",
+    "is", "was", "by", "from", "and", "or", "be", "it", "as",
+}
+
+
 def normalize_message(message: str) -> str:
     """去除动态内容并归一化同义词，生成标准化模板"""
     result = message.lower()
+    # 替换中文标点为空格
+    for ch in ":：，。()（）,":
+        result = result.replace(ch, " ")
+
+    # 中文同义短句归一化（在动态内容替换前，针对特定表述方式）
+    result = re.sub(r'连接池已满|连接池耗尽|connection pool exhausted|connection pool is full', ' pool_exhausted ', result)
+    result = re.sub(r'无响应|no response|no respon', ' noresponse ', result)
+    result = re.sub(r'查询失败|query failed', ' query_failed ', result)
 
     # 1. 去除动态内容
     for pattern, replacement in DYNAMIC_PATTERNS:
         result = pattern.sub(replacement, result)
 
-    # 2. 同义词归一化 — 匹配部分替换为标准词（带空格分隔），避免中英文连写
+    # 2. 同义词归一化
     for pattern, replacement in SYNONYM_PATTERNS:
         result = pattern.sub(f' {replacement.lower()} ', result)
 
-    # 3. 分词、去重重复 token（中英文同义词替换后可能产生重复概念）
-    # 使用 order-preserving unique: 保留首次出现的顺序，移除重复
+    # 额外：connection timeout → timeout, database connection timeout → database timeout
+    result = re.sub(r'\b(?:connection\s+)?timeout\b', ' timeout ', result)
+    # 额外：db connection timeout → timeout（db 已被归一化为 database，剩下 connection timeout）
+    result = re.sub(r'\bconnection timeout\b', ' timeout ', result)
+    # 去除 DURATION token（不影响根因判断）
+    result = re.sub(r'<DURATION>', ' ', result)
+
+    # 3. 分词、去停用词、去重
+    tokens = result.split()
     seen = set()
     deduped = []
-    for token in result.split():
+    for token in tokens:
+        if token in STOP_WORDS:
+            continue
         if token not in seen:
             seen.add(token)
             deduped.append(token)
