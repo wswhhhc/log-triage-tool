@@ -1,0 +1,5 @@
+{"source":"auth-gateway","level":"warn","timestamp":"2024-06-10T10:00:00Z","message":"rate limit exceeded for IP 192.168.1.100, 503 returned"}
+{"source":"auth-gateway","level":"warn","timestamp":"2024-06-10T10:01:00Z","message":"API rate limit approaching: 998/1000 requests for token usr_tkn_001"}
+{"source":"notification-worker","level":"warn","timestamp":"2024-06-10T11:00:00Z","message":"邮件队列积压: current_size=5000, threshold=1000","job":"send_notification"}
+{"source":"etl-job","level":"error","timestamp":"2024-06-10T12:00:00Z","message":"output file write failed: disk quota exceeded for /data/etl/output/report.parquet","task":"daily_report"}
+{"source":"risk-api","level":"error","timestamp":"2024-06-10T13:00:00Z","message":"risk API rate limit exceeded: 100 requests/min reached","job":"risk_check"}

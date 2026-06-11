@@ -1,0 +1,11 @@
+{"source":"payment-service","level":"error","timestamp":"2024-06-10T10:00:00Z","message":"Database timeout after 30000ms for order_id=ORD-50001, connection pool exhausted","job_name":"process_payment"}
+{"source":"auth-gateway","level":"error","time":"2024/06/10 12:05:30","msg":"token validation failed for user_id=50001: JWT signature invalid"}
+{"source":"order-worker","level":"fatal","timestamp":"2024-06-10T10:00:00Z","message":"database is unavailable after 3 retries for transaction TX-50001"}
+{"source":"order-worker","level":"error","timestamp":"2024-06-10T10:00:00Z","message":"Failed to update inventory: connection refused to inventory-service:9090"}
+{"source":"order-worker","level":"error","timestamp":"2024-06-10T10:00:00Z","message":"order processing failed: validation error for order_id=ORD-50002, invalid item_id=100"}
+{"source":"auth-gateway","level":"warn","timestamp":"2024-06-10T10:00:00Z","message":"rate limit exceeded for IP 192.168.1.100, 503 returned"}
+{"source":"inventory-service","level":"warn","timestamp":"2024-06-10T10:00:00Z","message":"库存数据异常: product_id=50001 库存量负值 -5","job":"sync_inventory"}
+{"source":"order-worker","level":"info","timestamp":"2024-06-10T09:00:00Z","message":"订单 ORD-50003 创建成功"}
+{"source":"payment-service","level":"info","timestamp":"2024-06-10T09:30:00Z","message":"支付渠道健康检查通过: channel=alipay"}
+这不是JSON
+{"timestamp":"2024-06-10T10:00:00Z","source":"bad-worker"}

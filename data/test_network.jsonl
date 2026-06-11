@@ -1,0 +1,4 @@
+{"source":"order-worker","level":"error","timestamp":"2024-06-10T10:00:00Z","message":"Failed to update inventory: connection refused to inventory-service:9090","trace_id":"x1y2z3-abc-def"}
+{"source":"order-worker","level":"error","timestamp":"2024-06-10T10:01:00Z","message":"无法连接库存服务: dial tcp 10.0.1.50:9090: connection refused","trace_id":"x1y2z3-def-ghi"}
+{"source":"notification-worker","level":"error","timestamp":"2024-06-10T11:00:00Z","message":"sending email failed: SMTP server 10.0.2.50:25 connection refused","job":"send_notification"}
+{"source":"notification-worker","level":"error","timestamp":"2024-06-10T11:01:00Z","message":"发送邮件失败: 无法连接到 SMTP 服务器 10.0.2.50:25","job":"send_notification"}
