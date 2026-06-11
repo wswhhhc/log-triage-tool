@@ -1,6 +1,7 @@
 import os
+import tempfile
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -110,6 +111,23 @@ def change_status(issue_id: str, status: str = Query(...)):
 @app.get("/api/stats")
 def statistics():
     """统计 API"""
+    return get_stats()
+
+
+@app.post("/api/upload")
+async def upload_logs(file: UploadFile = File(...)):
+    """上传 JSONL 日志文件并重新处理"""
+    if not file.filename or not file.filename.endswith(('.jsonl', '.json', '.log')):
+        raise HTTPException(status_code=400, detail="仅支持 .jsonl / .json / .log 文件")
+    content = await file.read()
+    # 保存到临时文件
+    with tempfile.NamedTemporaryFile(mode='wb', suffix='.jsonl', delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+    try:
+        process_logs(tmp_path)
+    finally:
+        os.unlink(tmp_path)
     return get_stats()
 
 

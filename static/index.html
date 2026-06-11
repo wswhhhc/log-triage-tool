@@ -44,6 +44,13 @@ tr.expanded { background: #f0f4ff; }
 .status-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
 .toggle-btn { cursor: pointer; color: #3498db; font-size: 12px; }
 .toggle-btn:hover { text-decoration: underline; }
+.toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.upload-area { display: flex; align-items: center; gap: 8px; }
+.upload-label { display: inline-block; padding: 8px 16px; background: #3498db; color: #fff; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 500; }
+.upload-label:hover { background: #2980b9; }
+.file-name { font-size: 13px; color: #7f8c8d; }
+.refresh-btn { padding: 8px 16px; border: 1px solid #bdc3c7; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; }
+.refresh-btn:hover { background: #f0f0f0; }
 .human-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; }
 .human-yes { background: #ffeaa7; color: #d35400; }
 .human-no { background: #d5f5e3; color: #27ae60; }
@@ -56,6 +63,14 @@ tr.expanded { background: #f0f4ff; }
 <body>
 <div class="container">
     <h1>日志异常分诊工具</h1>
+    <div class="toolbar">
+        <div class="upload-area">
+            <label class="upload-label" for="fileInput">+ 导入 JSONL 日志</label>
+            <input type="file" id="fileInput" accept=".jsonl,.json,text/plain" hidden>
+            <span class="file-name" id="fileName"></span>
+        </div>
+        <button class="refresh-btn" onclick="loadData()">刷新</button>
+    </div>
     <div class="stats" id="stats"></div>
     <div id="content"><p style="color:#999;text-align:center;padding:40px">加载中...</p></div>
 </div>
@@ -186,6 +201,22 @@ function formatTime(t) {
 }
 
 loadData();
+
+document.getElementById('fileInput').addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('fileName').textContent = file.name + ' (uploading...)';
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (!res.ok) { alert('Upload failed'); return; }
+        document.getElementById('fileName').textContent = file.name + ' (done)';
+        await loadData();
+    } catch(e) {
+        alert('Upload error: ' + e.message);
+    }
+});
 </script>
 </body>
 </html>
