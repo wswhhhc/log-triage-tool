@@ -1,0 +1,54 @@
+{"service":"payment-service","level":"error","timestamp":"2024-03-15T10:23:45Z","message":"Database timeout after 30000ms for order_id=ORD-88271, connection pool exhausted","trace_id":"a1b2c3d4-e5f6-7890-abcd-ef1234567890","job_name":"process_payment"}
+{"service":"payment-service","level":"error","timestamp":"2024-03-15T10:24:12Z","message":"数据库超时: order_id=ORD-99231, 连接池已满","trace_id":"b2c3d4e5-f6a7-8901-bcde-f12345678901","job_name":"process_payment"}
+{"service":"payment-service","level":"error","timestamp":"2024-03-15T10:25:33Z","message":"db connection timeout for order_id=ORD-10342","job_name":"process_payment"}
+{"service":"payment-service","level":"info","time":"2024-03-15T10:20:00Z","msg":"Payment processed OK: order_id=ORD-88100"}
+{"service":"payment-service","level":"error","timestamp":"2024-03-15T10:30:00Z","message":"支付超时: order_id=ORD-11503, 下游服务无响应","trace_id":"c3d4e5f6-a7b8-9012-cdef-f12345678902","job_name":"process_payment"}
+{"service":"payment-service","level":"error","timestamp":"2024-03-15T10:35:10Z","message":"payment timeout for order_id=ORD-12888, third-party gateway no response","job_name":"process_payment"}
+{"service":"payment-service","level":"warn","timestamp":"2024-03-15T09:15:00Z","message":"订单 ORD-55832 处理时间超过 5s 阈值","job_name":"process_payment"}
+{"source":"order-worker","severity":"error","created_at":1710498225,"error":"Failed to update inventory: connection refused to inventory-service:9090","trace_id":"x1y2z3-abc-def"}
+{"source":"order-worker","severity":"error","created_at":1710498350,"error":"无法连接库存服务: dial tcp 10.0.1.50:9090: connection refused","trace_id":"x1y2z3-def-ghi"}
+{"source":"order-worker","severity":"fatal","created_at":1710499000,"error":"database is unavailable after 3 retries for transaction TX-9942, order_id=ORD-12345 cannot be committed"}
+{"source":"order-worker","severity":"error","created_at":1710499100,"error":"数据库不可用: 事务 TX-10732 提交失败, 连接池已耗尽"}
+{"source":"order-worker","level":"info","timestamp":"2024-03-15T08:15:00Z","message":"订单 ORD-77100 创建成功","job":"process_order"}
+{"source":"order-worker","severity":"error","created_at":1710499400,"error":"order processing failed: validation error for order_id=ORD-55661, invalid item_id=889933"}
+{"source":"order-worker","severity":"error","created_at":1710499500,"error":"订单处理失败: 订单 ORD-66225 商品 ID 格式错误"}
+{"app":"auth-gateway","level":"error","time":"2024/03/15 12:05:30","msg":"token validation failed for user_id=55432: JWT signature invalid","request_id":"req-abc-123"}
+{"app":"auth-gateway","level":"error","time":"2024/03/15 12:06:00","msg":"用户认证失败: permission denied for user_id=66123 accessing /api/admin"}
+{"app":"auth-gateway","level":"warn","@timestamp":"2024-03-15T12:10:00Z","detail":"rate limit exceeded for IP 192.168.1.100, 503 returned"}
+{"app":"auth-gateway","level":"error","time":"2024/03/15 12:15:00","msg":"unauthorized access attempt detected from IP 10.0.0.55, token expired"}
+{"app":"auth-gateway","level":"info","time":"2024/03/15 11:00:00","msg":"user_id=44001 login successful"}
+{"system":"inventory-service","level":"error","log_time":"2024-03-15 11:30:00","message":"inventory validation failed: SKU=INVALID_FORAMT, required field 'quantity' missing","job":"sync_inventory"}
+{"system":"inventory-service","level":"error","log_time":"2024-03-15 11:35:00","message":"Redis 连接超时，缓存查询失败: getStockLevel(user_id=44556, product_id=998877)"}
+{"system":"inventory-service","level":"error","log_time":"2024-03-15 11:40:00","message":"redis connection timeout for stock query: product_id=123456","job":"sync_inventory"}
+{"system":"inventory-service","level":"info","log_time":"2024-03-15 09:00:00","message":"库存同步完成: batch_id=4421"}
+{"source":"notification-worker","level":"error","timestamp":"2024-03-15T14:00:00Z","message":"sending email failed: SMTP server 10.0.2.50:25 connection refused","job":"send_notification"}
+{"source":"notification-worker","level":"error","timestamp":"2024-03-15T14:05:00Z","message":"发送邮件失败: 无法连接到 SMTP 服务器 10.0.2.50:25","job":"send_notification"}
+{"source":"notification-worker","level":"warn","timestamp":"2024-03-15T13:55:00Z","message":"邮件队列积压: current_size=1234, threshold=1000","job":"send_notification"}
+{"source":"notification-worker","level":"info","timestamp":"2024-03-15T13:50:00Z","message":"notification sent to user_id=77123"}
+{"source":"etl-job","level":"error","timestamp":"2024-03-14T23:00:00Z","message":"ETL job daily_sync failed: source database timed out reading batch 445, retry 1/3","task":"daily_sync"}
+{"source":"etl-job","level":"error","timestamp":"2024-03-14T23:05:00Z","message":"ETL job daily_sync failed: source database timed out reading batch 446, retry 2/3","task":"daily_sync"}
+{"source":"etl-job","level":"error","timestamp":"2024-03-14T23:10:00Z","message":"ETL job daily_sync failed after all retries: database connection lost","task":"daily_sync"}
+{"source":"etl-job","level":"error","timestamp":"2024-03-14T22:00:00Z","message":"ETL job weekly_report failed: 源数据库超时读取分区 12","task":"weekly_report"}
+{"source":"etl-job","level":"info","timestamp":"2024-03-14T22:30:00Z","message":"ETL job weekly_report completed successfully: rows_processed=1048576","task":"weekly_report"}
+{"service":"payment-service","level":"error","timestamp":"2024-03-15T10:45:00Z","message":"database query failed: connection pool exhausted for pool size=10, active=10","job_name":"process_payment"}
+{"source":"order-worker","severity":"error","created_at":1710499600,"error":"permission denied: worker cannot access queue order_processing_high","trace_id":"x1y2z3-ghi-jkl"}
+{"app":"auth-gateway","level":"warn","@timestamp":"2024-03-15T12:20:00Z","detail":"API rate limit approaching: 998/1000 requests for token usr_tkn_44331"}
+{"system":"inventory-service","level":"warn","log_time":"2024-03-15 10:00:00","message":"库存数据异常: product_id=554433 库存量负值 -5"}
+{"source":"notification-worker","level":"error","timestamp":"2024-03-15T14:10:00Z","message":"email template rendering failed for template_id=tpl_887: required field 'user_name' missing","job":"send_notification"}
+{"source":"etl-job","level":"error","timestamp":"2024-03-14T23:15:00Z","message":"output file write failed: disk quota exceeded for /data/etl/output/daily_sync.parquet","task":"daily_sync"}
+{"service":"payment-service","level":"info","timestamp":"2024-03-15T09:30:00Z","message":"支付渠道健康检查通过: channel=alipay","job_name":"health_check"}
+{"source":"order-worker","level":"info","timestamp":"2024-03-15T07:00:00Z","message":"worker started: pid=88321, max_concurrency=50"}
+{"app":"auth-gateway","level":"info","time":"2024/03/15 10:00:00","msg":"认证网关启动完成"}
+{"system":"inventory-service","level":"info","log_time":"2024-03-15 08:00:00","message":"库存服务启动正常, 连接 Redis 成功"}
+{"source":"risk-api","level":"error","timestamp":"2024-03-15T16:00:00Z","message":"risk evaluation failed for transaction TX-88301: downstream service timeout after 10s","trace_id":"risk-trace-001"}
+{"source":"risk-api","level":"error","timestamp":"2024-03-15T16:05:00Z","message":"风险评估超时: 交易 TX-88402 风控模型无响应","trace_id":"risk-trace-002"}
+{"source":"risk-api","level":"error","timestamp":"2024-03-15T16:10:00Z","message":"risk API rate limit exceeded: token rsk_tkn_991, 100 requests/min","job":"risk_check"}
+{"source":"risk-api","level":"info","timestamp":"2024-03-15T15:00:00Z","message":"risk check passed for transaction TX-77001"}
+{"source":"search-service","level":"warn","timestamp":"2024-03-15T17:00:00Z","message":"elasticsearch query timeout for index=products, took 12500ms","trace_id":"es-trace-101","job":"search_products"}
+{"source":"search-service","level":"error","timestamp":"2024-03-15T17:05:00Z","message":"Elasticsearch 查询超时: index=orders, took 30s","trace_id":"es-trace-102","job":"search_orders"}
+{"source":"search-service","level":"info","timestamp":"2024-03-15T16:50:00Z","message":"search index rebuilt: index=products, docs=50000"}
+{"service":"unknown-worker","level":"info","timestamp":"2024-03-15T09:00:00Z","message":"运行中"}
+这是完全无效的内容不是JSON
+{"timestamp":"2024-03-15T10:00:00Z","source":"bad-worker"}
+{"source":"bad-worker","level":"error","timestamp":"INVALID_DATE"}
+{"system":"broken-service","severity":"error","created_at":1710499000}

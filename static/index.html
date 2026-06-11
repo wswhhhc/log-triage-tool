@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日志异常分诊工具</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'Microsoft YaHei', sans-serif; background: #f5f6fa; color: #333; padding: 20px; }
+.container { max-width: 1280px; margin: 0 auto; }
+h1 { font-size: 24px; margin-bottom: 20px; color: #2c3e50; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.stat-card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); text-align: center; }
+.stat-card .num { font-size: 28px; font-weight: 700; color: #3498db; }
+.stat-card .label { font-size: 12px; color: #7f8c8d; margin-top: 4px; }
+.stat-card.warn .num { color: #e67e22; }
+.stat-card.danger .num { color: #e74c3c; }
+.stat-card.success .num { color: #27ae60; }
+table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+th, td { padding: 10px 12px; text-align: left; font-size: 14px; border-bottom: 1px solid #ecf0f1; }
+th { background: #f8f9fa; font-weight: 600; color: #555; font-size: 12px; text-transform: uppercase; }
+tr:hover { background: #f8f9fa; }
+tr.expanded { background: #f0f4ff; }
+.p0 { background: #ffeaea !important; }
+.p1 { background: #fff4e6 !important; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-p0 { background: #e74c3c; color: #fff; }
+.badge-p1 { background: #e67e22; color: #fff; }
+.badge-p2 { background: #f39c12; color: #fff; }
+.badge-p3 { background: #95a5a6; color: #fff; }
+.badge-open { background: #3498db; color: #fff; }
+.badge-investigating { background: #f39c12; color: #fff; }
+.badge-mitigated { background: #9b59b6; color: #fff; }
+.badge-resolved { background: #27ae60; color: #fff; }
+.badge-ignored { background: #95a5a6; color: #fff; }
+.detail-row { display: none; }
+.detail-row.show { display: table-row; }
+.detail-cell { padding: 12px 16px; background: #fafbfc; }
+.detail-content { font-size: 13px; line-height: 1.6; }
+.detail-content p { margin: 4px 0; }
+.detail-content .label { color: #7f8c8d; display: inline-block; width: 80px; }
+.status-btn { padding: 4px 10px; border: 1px solid #ddd; border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px; margin: 2px; }
+.status-btn:hover { background: #f0f0f0; }
+.status-btn.active { background: #3498db; color: #fff; border-color: #3498db; }
+.toggle-btn { cursor: pointer; color: #3498db; font-size: 12px; }
+.toggle-btn:hover { text-decoration: underline; }
+.human-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: 600; }
+.human-yes { background: #ffeaa7; color: #d35400; }
+.human-no { background: #d5f5e3; color: #27ae60; }
+@media (max-width: 768px) {
+    .stats { grid-template-columns: repeat(3, 1fr); }
+    th, td { padding: 8px; font-size: 12px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>日志异常分诊工具</h1>
+    <div class="stats" id="stats"></div>
+    <div id="content"><p style="color:#999;text-align:center;padding:40px">加载中...</p></div>
+</div>
+
+<script>
+let allIssues = [];
+
+async function loadData() {
+    try {
+        const [statsRes, issuesRes] = await Promise.all([
+            fetch('/api/stats'),
+            fetch('/api/issues')
+        ]);
+        const stats = await statsRes.json();
+        const issuesData = await issuesRes.json();
+        allIssues = issuesData.issues || [];
+        renderStats(stats);
+        renderIssues(allIssues);
+    } catch(e) {
+        document.getElementById('content').innerHTML = '<p style="color:#e74c3c;text-align:center;padding:40px">加载失败: ' + e.message + '</p>';
+    }
+}
+
+function renderStats(stats) {
+    const html = `
+        <div class="stat-card"><div class="num">${stats.total_logs}</div><div class="label">总日志</div></div>
+        <div class="stat-card success"><div class="num">${stats.valid_logs}</div><div class="label">有效日志</div></div>
+        <div class="stat-card warn"><div class="num">${stats.dirty_logs}</div><div class="label">脏数据</div></div>
+        <div class="stat-card warn"><div class="num">${stats.anomaly_logs}</div><div class="label">异常数</div></div>
+        <div class="stat-card"><div class="num">${stats.merged_issues}</div><div class="label">合并问题</div></div>
+        <div class="stat-card danger"><div class="num">${stats.needs_human_count}</div><div class="label">需人工</div></div>
+        <div class="stat-card success"><div class="num">${stats.auto_fixable_count}</div><div class="label">可自动</div></div>
+    `;
+    document.getElementById('stats').innerHTML = html;
+}
+
+function getPriorityBadge(p) {
+    if (!p) return '';
+    const map = {'P0':'badge-p0','P1':'badge-p1','P2':'badge-p2','P3':'badge-p3'};
+    return `<span class="badge ${map[p] || ''}">${p}</span>`;
+}
+
+function getStatusBadge(s) {
+    const map = {
+        'open': 'badge-open', 'investigating': 'badge-investigating',
+        'mitigated': 'badge-mitigated', 'resolved': 'badge-resolved', 'ignored': 'badge-ignored'
+    };
+    return `<span class="badge ${map[s] || ''}">${s}</span>`;
+}
+
+function priorityOrder(p) {
+    if (!p || p === 'None') return 99;
+    return {'P0':0,'P1':1,'P2':2,'P3':3}[p] ?? 99;
+}
+
+function renderIssues(issues) {
+    issues.sort((a, b) => priorityOrder(a.priority) - priorityOrder(b.priority));
+
+    if (issues.length === 0) {
+        document.getElementById('content').innerHTML = '<p style="color:#999;text-align:center;padding:40px">暂无异常问题</p>';
+        return;
+    }
+
+    let html = '<table><thead><tr><th>优先级</th><th>类型</th><th>来源</th><th>消息模板</th><th>次数</th><th>首次</th><th>状态</th><th>人工</th><th></th></tr></thead><tbody>';
+
+    issues.forEach((issue, idx) => {
+        const pClass = issue.priority === 'P0' ? 'p0' : issue.priority === 'P1' ? 'p1' : '';
+        html += `<tr class="${pClass}" id="row-${idx}">`;
+        html += `<td>${getPriorityBadge(issue.priority)}</td>`;
+        html += `<td><span class="badge" style="background:#ecf0f1;color:#555;">${issue.anomaly_type}</span></td>`;
+        html += `<td>${issue.source}</td>`;
+        html += `<td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(issue.message_template)}</td>`;
+        html += `<td>${issue.occurrence_count}</td>`;
+        html += `<td style="font-size:12px">${formatTime(issue.first_seen)}</td>`;
+        html += `<td>${getStatusBadge(issue.status)}</td>`;
+        html += `<td><span class="human-badge ${issue.needs_human ? 'human-yes' : 'human-no'}">${issue.needs_human ? '是' : '否'}</span></td>`;
+        html += `<td><span class="toggle-btn" onclick="toggleDetail(${idx})">详情</span></td>`;
+        html += '</tr>';
+
+        html += `<tr class="detail-row" id="detail-${idx}"><td colspan="9"><div class="detail-cell"><div class="detail-content">`;
+        html += `<p><span class="label">优先级原因:</span> ${escapeHtml(issue.priority_reason || '无')}</p>`;
+        html += `<p><span class="label">处理建议:</span> ${escapeHtml(issue.recommendation || '无')}</p>`;
+        html += `<p><span class="label">人工原因:</span> ${escapeHtml(issue.human_reason || '无')}</p>`;
+        html += `<p><span class="label">fingerprint:</span> <code style="font-size:11px">${issue.fingerprint}</code></p>`;
+        html += `<p><span class="label">关联日志:</span> ${(issue.related_log_ids || []).join(', ') || '无'}</p>`;
+        html += `<p><span class="label">操作状态:</span></p>`;
+        html += `<div style="margin-top:4px">${['open','investigating','mitigated','resolved','ignored'].map(s =>
+            `<button class="status-btn ${issue.status === s ? 'active' : ''}" onclick="updateStatus('${issue.id}','${s}')">${s}</button>`
+        ).join('')}</div>`;
+        html += `</div></div></td></tr>`;
+    });
+
+    html += '</tbody></table>';
+    document.getElementById('content').innerHTML = html;
+}
+
+function toggleDetail(idx) {
+    const el = document.getElementById('detail-' + idx);
+    if (!el) return;
+    el.classList.toggle('show');
+    document.getElementById('row-' + idx)?.classList.toggle('expanded');
+}
+
+async function updateStatus(issueId, status) {
+    try {
+        const res = await fetch(`/api/issues/${issueId}/status?status=${status}`, { method: 'PUT' });
+        const data = await res.json();
+        if (data.ok) {
+            await loadData();
+        } else {
+            alert('更新失败');
+        }
+    } catch(e) {
+        alert('请求失败: ' + e.message);
+    }
+}
+
+function escapeHtml(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+function formatTime(t) {
+    if (!t) return '-';
+    return t.substring(0, 19).replace('T', ' ');
+}
+
+loadData();
+</script>
+</body>
+</html>
