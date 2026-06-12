@@ -14,8 +14,8 @@ from app.normalizer import normalize
 from app.parser import parse_jsonl
 from app.prioritizer import calculate_priority
 from app.recommender import get_recommendation, need_human
-from app.storage import (clear_all, get_all_issues, get_stats, get_conn,
-                         init_db, save_issues, save_logs, update_issue_status,
+from app.storage import (get_all_issues, get_stats, get_conn,
+                         init_db, update_issue_status,
                          _safe_json, _safe_timestamp)
 
 logging.basicConfig(level=logging.INFO, stream=sys.stderr,
@@ -134,56 +134,33 @@ def _run_pipeline(raw_logs, *, clear_existing=False):
         conn.close()
 
 
-def _save_parse_dirty(dirty_records: list):
-    """将解析阶段的脏数据写入 logs 表（仅用于统计，单独事务）"""
-    if not dirty_records:
-        return
-    conn = get_conn()
-    try:
-        c = conn.cursor()
-        for d in dirty_records:
-            line_num = d.get("line_number", 0)
-            raw_preview = d.get("raw_content", "")[:100]
-            reason = d.get("reason", "未知")
-            c.execute(
-                "INSERT OR REPLACE INTO logs VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    f"parse_dirty_{line_num}",
-                    None,
-                    "unknown",
-                    "unknown",
-                    f"parse dirty(line {line_num}): {raw_preview}",
-                    None,
-                    None,
-                    "{}",
-                    1,
-                    reason,
-                    1,
-                ),
-            )
-        conn.commit()
-        logger.info("已记录 %d 条解析脏数据", len(dirty_records))
-    except Exception:
-        conn.rollback()
-        logger.exception("写入解析脏数据失败")
-    finally:
-        conn.close()
-
-
 def process_logs(file_path: str):
     """
     完整的处理流水线（带事务保护，失败时可回滚）
 
-    步骤:
-      0. 解析 JSONL → 有效日志 + 脏数据
-      1. 核心流水线（事务包裹，自动清空旧数据）
-      2. 写入解析阶段的脏数据（独立事务，不参与异常归并）
+    所有日志（含解析阶段的脏数据）都经过同一套标准化 → 异常检测 → 分类 → 合并流程，
+    确保不会出现「被标记为异常但未归入任何 issue」的孤立数据。
     """
     raw_logs, parse_dirty = parse_jsonl(file_path)
 
-    issues = _run_pipeline(raw_logs, clear_existing=True)
-    _save_parse_dirty(parse_dirty)
+    # 将解析脏数据也构造成伪日志字典，走同一套标准化流程
+    # 这样 parse-level 的脏数据也会被分类、合并，最终出现在 issues 列表中
+    extra_raw = []
+    for d in parse_dirty:
+        extra_raw.append({
+            "_dirty_meta": {
+                "line_number": d.get("line_number", 0),
+                "raw_content": d.get("raw_content", "")[:200],
+                "reason": d.get("reason", "未知"),
+            },
+        })
 
+    all_raw = raw_logs + extra_raw
+    issues = _run_pipeline(all_raw, clear_existing=True)
+
+    total = len(raw_logs) + len(parse_dirty)
+    logger.info("处理完成: %d 条总日志 (%d 解析脏), %d 个问题",
+                total, len(parse_dirty), len(issues))
     return issues
 
 

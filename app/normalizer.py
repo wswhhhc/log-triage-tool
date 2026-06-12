@@ -153,6 +153,11 @@ def normalize(raw: dict, line_index: int) -> LogEntry:
             dirty_reason=f"输入类型错误: 期望 dict, 实际为 {type(raw).__name__}",
         )
 
+    # ── 处理解析阶段的脏数据 ──
+    # 这类 entry 由 parse_jsonl 中无法解析为 dict 的行产生，
+    # 通过 _dirty_meta 字段携带原始行信息和失败原因。
+    dirty_meta = raw.pop("_dirty_meta", None)
+
     timestamp = extract_timestamp(raw)
     source = extract_source(raw)
     level = extract_level(raw)
@@ -163,14 +168,21 @@ def normalize(raw: dict, line_index: int) -> LogEntry:
     is_dirty = False
     dirty_reasons = []
 
+    if dirty_meta:
+        # 解析脏数据：保留原始行内容作为消息，用解析失败原因
+        message = message or f"[解析失败] {dirty_meta.get('raw_content', '')[:200]}"
+        dirty_reasons.append(f"解析失败: {dirty_meta.get('reason', '未知')}")
+
     if timestamp is None:
-        is_dirty = True
         dirty_reasons.append("缺少时间戳或格式无法解析")
     if source is None:
         dirty_reasons.append("缺少来源系统")
     if message is None:
-        is_dirty = True
         dirty_reasons.append("错误信息缺失或过短")
+
+    # 有任何脏数据原因即标记为脏 — 确保 is_dirty 与 dirty_reason 始终一致
+    if dirty_reasons:
+        is_dirty = True
 
     return LogEntry(
         id=f"log_{line_index}",
