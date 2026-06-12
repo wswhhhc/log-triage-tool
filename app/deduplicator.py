@@ -164,7 +164,8 @@ def merge_anomalies(anomaly_logs: List[LogEntry],
 
         type_counts: Dict[AnomalyType, int] = defaultdict(int)
         for log in logs:
-            type_counts[classified[log.id]] += 1
+            at = classified.get(log.id, AnomalyType.UNKNOWN)
+            type_counts[at] += 1
         dominant_type = max(type_counts, key=type_counts.get)
 
         timestamps = [l.timestamp for l in sorted_logs if l.timestamp]

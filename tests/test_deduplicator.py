@@ -158,3 +158,19 @@ def test_merge_anomalies():
         i for i in issues if i.anomaly_type == AnomalyType.TIMEOUT]
     assert len(timeout_issues) == 1
     assert timeout_issues[0].occurrence_count == 2
+
+
+def test_merge_anomalies_missing_classification():
+    """merge_anomalies 在 classified 缺失某个 ID 时不崩溃，回退为 UNKNOWN"""
+    logs = [
+        make_log("timeout error", source="svc"),
+        make_log("database error", source="svc"),
+    ]
+    logs[0].id = "log_a"
+    logs[1].id = "log_b"
+    # 故意不提供 log_b 的分类
+    classified = {"log_a": AnomalyType.TIMEOUT}
+
+    issues = merge_anomalies(logs, classified)
+    # 不崩溃即成功，log_b 用 UNKNOWN 兜底
+    assert len(issues) >= 1
