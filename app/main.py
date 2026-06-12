@@ -80,8 +80,8 @@ def _run_pipeline(raw_logs, *, clear_existing=False):
                 ),
             )
 
-        # 4. 筛选异常
-        anomalies = [e for e in entries if is_anomaly(e)]
+        # 4. 筛选异常（直接用已设置的 flag）
+        anomalies = [e for e in entries if e.is_anomaly]
 
         # 5. 分类
         classified = {e.id: classify(e) for e in anomalies}
@@ -249,9 +249,9 @@ async def upload_logs(file: UploadFile = File(...)):
 
     try:
         process_logs(tmp_path)
-    except Exception as e:
+    except Exception:
         logger.exception("上传文件处理失败")
-        raise HTTPException(status_code=500, detail=f"处理失败: {e}")
+        raise HTTPException(status_code=500, detail="服务内部处理失败，请检查日志文件格式后重试")
     finally:
         os.unlink(tmp_path)
 

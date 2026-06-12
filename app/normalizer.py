@@ -33,6 +33,9 @@ def extract_timestamp(raw: dict) -> Optional[datetime]:
             continue
 
         # 1) 数值型时间戳
+        # 注意：Python 中 bool 是 int 的子类，必须先排除
+        if isinstance(val, bool):
+            continue
         if isinstance(val, (int, float)):
             if val <= 0:
                 continue
@@ -105,9 +108,20 @@ def extract_level(raw: dict) -> LogLevel:
 
 
 def extract_message(raw: dict) -> Optional[str]:
+    # 优先字符串
     val = _extract_first(raw, MESSAGE_FIELDS, allow_types=(str,))
-    if val is not None and len(val.strip()) >= 3:
-        return val
+    if val is not None:
+        stripped = val.strip()
+        if len(stripped) >= 3:
+            return val
+        return None
+
+    # 兜底：数值类型（如 "error": 500, "message": 503）
+    val = _extract_first(raw, MESSAGE_FIELDS, allow_types=(int, float))
+    if val is not None and isinstance(val, bool) is False:
+        str_val = str(val)
+        if len(str_val) >= 1:
+            return str_val
     return None
 
 
