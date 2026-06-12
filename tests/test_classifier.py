@@ -74,3 +74,29 @@ def test_classify_timeout_before_database():
     """timeout 优先级高于 database — 同时出现时归为 TIMEOUT"""
     log = make_log("database timeout after 30s")
     assert classify(log) == AnomalyType.TIMEOUT
+
+
+def test_dirty_log_classified_by_content_first():
+    """
+    脏数据但消息内容能识别类型时，以内容分类为准
+    不应因为是脏数据就全部归为 DATA_QUALITY
+    """
+    log = make_log("database timeout", level=LogLevel.WARN, is_dirty=True)
+    assert classify(log) == AnomalyType.TIMEOUT, "应该优先按内容分类"
+
+
+def test_dirty_log_without_clear_type_becomes_data_quality():
+    """脏数据且消息无法归类时 → DATA_QUALITY"""
+    log = make_log("", level=LogLevel.INFO, is_dirty=True)
+    assert classify(log) == AnomalyType.DATA_QUALITY
+
+
+def test_classify_resource_limit_new_keywords():
+    """新增关键词分类"""
+    log = make_log("disk quota exceeded", level=LogLevel.ERROR)
+    assert classify(log) == AnomalyType.RESOURCE_LIMIT
+
+
+def test_classify_resource_limit_quota():
+    log = make_log("quota exceeded for namespace", level=LogLevel.ERROR)
+    assert classify(log) == AnomalyType.RESOURCE_LIMIT

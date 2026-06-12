@@ -3,10 +3,11 @@ from app.models import LogEntry, LogLevel, AnomalyType
 from datetime import datetime
 
 
-def make_log(message, source="test-service"):
+def make_log(message, source="test-service", raw=None):
     return LogEntry(
         id="x", timestamp=datetime.now(), source=source,
-        level=LogLevel.ERROR, message=message, trace_id="tr-123"
+        level=LogLevel.ERROR, message=message, trace_id="tr-123",
+        raw=raw or {},
     )
 
 
@@ -30,13 +31,33 @@ def test_normalize_removes_ip():
     assert "192.168.1.100" not in normalized
 
 
+def test_normalize_removes_url():
+    msg = "callback failed: https://api.example.com/v1/hook?token=abc"
+    normalized = normalize_message(msg)
+    assert "https://" not in normalized
+
+
+def test_normalize_removes_path():
+    msg = "write failed to /data/output/file.parquet"
+    normalized = normalize_message(msg)
+    assert "/data/" not in normalized
+
+
 def test_normalize_synonym():
     """中英文同义词被归一化"""
     msg = "数据库 connection timeout"
     normalized = normalize_message(msg)
-    # "数据库"被归一化为"database"，"超时"不在msg中所以不用检查
     assert "数据库" not in normalized
     assert "database" in normalized
+
+
+def test_normalize_abbreviation():
+    """常见缩写被归一化"""
+    normalized = normalize_message("conn lost")
+    assert "connection" in normalized, f"conn 应扩展为 connection, 实际: {normalized}"
+    assert "error" in normalize_message("err: failed")
+    assert "request" in normalize_message("req failed")
+    assert "response" in normalize_message("resp invalid")
 
 
 def test_same_error_different_ids_same_fingerprint():
@@ -81,6 +102,38 @@ def test_different_source_different_fingerprint():
     fp2 = generate_fingerprint(log2, AnomalyType.TIMEOUT)
 
     assert fp1 != fp2
+
+
+def test_unknown_source_different_raw_content_different_fingerprint():
+    """
+    unknown source 但原始内容不同 → 不同 fingerprint
+    这是抗脏数据的关键：缺少 source 的两个服务不会被错误合并
+    """
+    log1 = make_log("database timeout", source="unknown",
+                    raw={"service": "payment-service", "message": "timeout"})
+    log2 = make_log("database timeout", source="unknown",
+                    raw={"app": "order-worker", "message": "timeout"})
+
+    fp1 = generate_fingerprint(log1, AnomalyType.TIMEOUT)
+    fp2 = generate_fingerprint(log2, AnomalyType.TIMEOUT)
+
+    assert fp1 != fp2, "不同服务的 unknown source 不应合并"
+
+
+def test_unknown_source_same_raw_content_same_fingerprint():
+    """
+    unknown source 但原始内容相同 → 同一 fingerprint
+    同一服务多条日志仍应合并
+    """
+    log1 = make_log("database timeout", source="unknown",
+                    raw={"service": "my-svc", "job": "job-1"})
+    log2 = make_log("database timeout", source="unknown",
+                    raw={"service": "my-svc", "job": "job-1"})
+
+    fp1 = generate_fingerprint(log1, AnomalyType.TIMEOUT)
+    fp2 = generate_fingerprint(log2, AnomalyType.TIMEOUT)
+
+    assert fp1 == fp2, "同一 unknown 来源的日志应合并"
 
 
 def test_merge_anomalies():

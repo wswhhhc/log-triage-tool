@@ -2,7 +2,7 @@ import math
 
 from app.models import AnomalyIssue, AnomalyType, Priority
 
-# 核心服务定义
+# 核心服务定义（精确匹配）
 CORE_SERVICES = {"payment-service", "order-worker", "auth-gateway", "risk-api"}
 
 # 权重配置
@@ -11,8 +11,15 @@ WEIGHTS = {
     "frequency": 0.25,
     "core_service": 0.25,
     "unknown": 0.15,
-    "data_quality": 0.05,
+    "data_quality": 0.10,   # 从 0.05 提至 0.10 — 数据质量问题值得更高关注
 }
+
+
+def _is_core_service(source: str) -> bool:
+    """精确匹配核心服务"""
+    if not isinstance(source, str):
+        return False
+    return source in CORE_SERVICES
 
 
 def calculate_priority(issue: AnomalyIssue):
@@ -44,7 +51,7 @@ def calculate_priority(issue: AnomalyIssue):
     reasons.append(f"重复次数={issue.occurrence_count}(得分{frequency:.1f})")
 
     # 3. 核心业务链路 (0 或 10)
-    is_core = any(svc in issue.source for svc in CORE_SERVICES)
+    is_core = _is_core_service(issue.source)
     core_score = 10 if is_core else 0
     score += WEIGHTS["core_service"] * core_score
     reasons.append(f"核心链路={'是' if is_core else '否'}(得分{core_score})")

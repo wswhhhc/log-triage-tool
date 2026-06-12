@@ -76,13 +76,14 @@ tr.expanded { background: #f0f4ff; }
 </div>
 
 <script>
+const API_BASE = '/log-triage';
 let allIssues = [];
 
 async function loadData() {
     try {
         const [statsRes, issuesRes] = await Promise.all([
-            fetch('/api/stats'),
-            fetch('/api/issues')
+            fetch(API_BASE + '/api/stats'),
+            fetch(API_BASE + '/api/issues')
         ]);
         const stats = await statsRes.json();
         const issuesData = await issuesRes.json();
@@ -176,7 +177,7 @@ function toggleDetail(idx) {
 
 async function updateStatus(issueId, status) {
     try {
-        const res = await fetch(`/api/issues/${issueId}/status?status=${status}`, { method: 'PUT' });
+        const res = await fetch(API_BASE + `/api/issues/${issueId}/status?status=${status}`, { method: 'PUT' });
         const data = await res.json();
         if (data.ok) {
             await loadData();
@@ -209,7 +210,7 @@ document.getElementById('fileInput').addEventListener('change', async function(e
     const formData = new FormData();
     formData.append('file', file);
     try {
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const res = await fetch(API_BASE + '/api/upload', { method: 'POST', body: formData });
         if (!res.ok) { alert('Upload failed'); return; }
         document.getElementById('fileName').textContent = file.name + ' (done)';
         await loadData();

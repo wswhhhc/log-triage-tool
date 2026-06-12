@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from datetime import datetime
 from typing import Dict, List
 
 from app.models import AnomalyIssue, IssueStatus, LogEntry
@@ -13,8 +14,28 @@ def get_conn():
     return conn
 
 
+def _safe_json(value, default=None) -> str:
+    """安全 JSON 序列化，失败时返回 fallback"""
+    try:
+        return json.dumps(value, ensure_ascii=False, default=str)
+    except (TypeError, ValueError, RecursionError):
+        return json.dumps(default) if default is not None else "{}"
+
+
+def _safe_timestamp(dt) -> str:
+    """安全的时间戳转字符串"""
+    if dt is None:
+        return None
+    if isinstance(dt, datetime):
+        return dt.isoformat()
+    try:
+        return str(dt)
+    except Exception:
+        return None
+
+
 def init_db():
-    """初始化数据库"""
+    """初始化数据库（含索引）"""
     conn = get_conn()
     c = conn.cursor()
 
@@ -54,6 +75,24 @@ def init_db():
         )
     """)
 
+    # ── 索引（使用 IF NOT EXISTS 以保证幂等） ──
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_logs_source ON logs(source)",
+        "CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level)",
+        "CREATE INDEX IF NOT EXISTS idx_logs_is_dirty ON logs(is_dirty)",
+        "CREATE INDEX IF NOT EXISTS idx_logs_is_anomaly ON logs(is_anomaly)",
+        "CREATE INDEX IF NOT EXISTS idx_issues_anomaly_type ON issues(anomaly_type)",
+        "CREATE INDEX IF NOT EXISTS idx_issues_priority ON issues(priority)",
+        "CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status)",
+        "CREATE INDEX IF NOT EXISTS idx_issues_source ON issues(source)",
+        "CREATE INDEX IF NOT EXISTS idx_issues_fingerprint ON issues(fingerprint)",
+    ]
+    for idx_sql in indexes:
+        try:
+            c.execute(idx_sql)
+        except sqlite3.OperationalError:
+            pass  # 索引已存在（旧版 SQLite 兼容）
+
     conn.commit()
     conn.close()
 
@@ -77,13 +116,13 @@ def save_logs(logs: List[LogEntry]):
             "INSERT OR REPLACE INTO logs VALUES (?,?,?,?,?,?,?,?,?,?,?)",
             (
                 log.id,
-                str(log.timestamp) if log.timestamp else None,
+                _safe_timestamp(log.timestamp),
                 log.source,
                 log.level.value,
                 log.message,
                 log.job_name,
                 log.trace_id,
-                json.dumps(log.raw, ensure_ascii=False),
+                _safe_json(log.raw, {}),
                 int(log.is_dirty),
                 log.dirty_reason,
                 int(log.is_anomaly) if hasattr(log, 'is_anomaly') else 0,
@@ -107,9 +146,9 @@ def save_issues(issues: List[AnomalyIssue]):
                 issue.priority.value if issue.priority else None,
                 issue.source,
                 issue.message_template,
-                json.dumps(issue.related_log_ids),
-                str(issue.first_seen),
-                str(issue.last_seen),
+                _safe_json(issue.related_log_ids, []),
+                _safe_timestamp(issue.first_seen),
+                _safe_timestamp(issue.last_seen),
                 issue.occurrence_count,
                 issue.status.value,
                 int(issue.needs_human),
@@ -143,8 +182,11 @@ def get_all_issues() -> List[dict]:
     for r in rows:
         d = dict(r)
         if isinstance(d.get("related_log_ids"), str):
-            d["related_log_ids"] = json.loads(d["related_log_ids"])
-        if isinstance(d.get("needs_human"), bool):
+            try:
+                d["related_log_ids"] = json.loads(d["related_log_ids"])
+            except (json.JSONDecodeError, TypeError):
+                d["related_log_ids"] = []
+        if not isinstance(d.get("needs_human"), int):
             d["needs_human"] = int(d["needs_human"])
         result.append(d)
     return result

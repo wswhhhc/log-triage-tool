@@ -48,6 +48,15 @@ def test_level_mapping():
     assert extract_level({"level": "debug"}) == LogLevel.DEBUG
 
 
+def test_extended_level_mapping():
+    """补充等级映射"""
+    assert extract_level({"level": "TRACE"}) == LogLevel.DEBUG
+    assert extract_level({"level": "NOTICE"}) == LogLevel.WARN
+    assert extract_level({"level": "ALERT"}) == LogLevel.CRITICAL
+    assert extract_level({"level": "EMERGENCY"}) == LogLevel.CRITICAL
+    assert extract_level({"level": "EMERG"}) == LogLevel.CRITICAL
+
+
 def test_extract_timestamp_various_formats():
     """不同时间格式解析"""
     iso = extract_timestamp({"timestamp": "2024-03-15T10:00:00Z"})
@@ -64,6 +73,51 @@ def test_extract_timestamp_various_formats():
     assert slash is not None
 
 
+def test_extract_timestamp_timezone_offset():
+    """带时区偏移的时间格式"""
+    offset = extract_timestamp({"timestamp": "2024-03-15T10:00:00+08:00"})
+    assert offset is not None
+    # 10:00 +08:00 = 02:00 UTC
+    assert offset.hour == 2, f"期望 02:00 UTC, 实际 {offset.hour}"
+
+    offset2 = extract_timestamp({"timestamp": "2024-03-15T10:00:00.123+08:00"})
+    assert offset2 is not None
+
+    offset3 = extract_timestamp({"timestamp": "2024-03-15T02:00:00Z"})
+    assert offset3 is not None
+
+
+def test_extract_timestamp_unreasonable():
+    """不合理时间戳被拒绝"""
+    assert extract_timestamp({"timestamp": 9e12}) is None   # 未来时间
+    assert extract_timestamp({"timestamp": "1800-01-01T00:00:00Z"}) is None  # 太早
+    assert extract_timestamp({"timestamp": "3000-01-01T00:00:00Z"}) is None  # 太晚
+    assert extract_timestamp({"timestamp": -1}) is None  # 负数
+
+
+def test_non_string_source():
+    """source 为非字符串时优雅降级"""
+    entry = normalize({"source": {"host": "svc-1"}, "level": "error", "message": "fail"}, 0)
+    # dict 类型不会被 _extract_first 提取
+    assert entry.source == "unknown"
+    assert "缺少来源系统" in entry.dirty_reason
+
+
+def test_non_dict_input():
+    """normalize 接收非 dict 输入不崩溃"""
+    entry = normalize(None, 0)
+    assert entry.is_dirty
+    assert "输入类型错误" in entry.dirty_reason
+
+    entry2 = normalize("string", 1)
+    assert entry2.is_dirty
+    assert "输入类型错误" in entry2.dirty_reason
+
+    entry3 = normalize(42, 2)
+    assert entry3.is_dirty
+    assert "输入类型错误" in entry3.dirty_reason
+
+
 def test_job_name_extraction():
     """任务名称提取"""
     log = {"source": "x", "level": "error",
@@ -75,3 +129,17 @@ def test_job_name_extraction():
             "message": "fail", "task": "my_task"}
     entry2 = normalize(log2, 0)
     assert entry2.job_name == "my_task"
+
+
+def test_non_string_job_name():
+    """job_name 非字符串时安全处理"""
+    entry = normalize({"source": "x", "level": "error",
+                       "message": "fail", "job": 12345}, 0)
+    assert entry.job_name is None  # 数字类型不被提取
+
+
+def test_non_utf8_characters():
+    """包含特殊 Unicode 字符的消息不崩溃"""
+    entry = normalize({"source": "x", "level": "error",
+                       "message": "error: 𐀀 test"}, 0)
+    assert entry.message is not None
