@@ -51,6 +51,12 @@ def classify(log: LogEntry) -> AnomalyType:
     """对异常日志进行分类（注意：TIMEOUT 优先级最高，必须放最前）"""
     msg = log.message.lower() if log.message else ""
 
+    # ── 解析脏数据（直接标记 DATA_QUALITY，不参与关键词分类） ──
+    # 这类 entry 的消息内容是系统生成的（"[解析失败] ..."），其中的关键词（如"无效"）
+    # 反映的是 JSON 解析结果而非业务逻辑，不应误导分类。
+    if log.dirty_reason and log.dirty_reason.startswith("解析失败"):
+        return AnomalyType.DATA_QUALITY
+
     # ── TIMEOUT（放最前面，因为 timeout 常与其他类型共存） ──
     if any(kw in msg for kw in ["timeout", "超时", "timed out", "timed-out"]):
         return AnomalyType.TIMEOUT

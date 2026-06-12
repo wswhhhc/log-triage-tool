@@ -153,7 +153,9 @@ def merge_anomalies(anomaly_logs: List[LogEntry],
     """将异常日志按 fingerprint 合并"""
     groups = defaultdict(list)
     for log in anomaly_logs:
-        fp = generate_fingerprint(log, classified[log.id])
+        # 防御：如果分类不存在，回退为 UNKNOWN
+        atype = classified.get(log.id, AnomalyType.UNKNOWN)
+        fp = generate_fingerprint(log, atype)
         groups[fp].append(log)
 
     issues = []
@@ -162,7 +164,8 @@ def merge_anomalies(anomaly_logs: List[LogEntry],
 
         type_counts: Dict[AnomalyType, int] = defaultdict(int)
         for log in logs:
-            type_counts[classified[log.id]] += 1
+            at = classified.get(log.id, AnomalyType.UNKNOWN)
+            type_counts[at] += 1
         dominant_type = max(type_counts, key=type_counts.get)
 
         timestamps = [l.timestamp for l in sorted_logs if l.timestamp]

@@ -143,3 +143,29 @@ def test_non_utf8_characters():
     entry = normalize({"source": "x", "level": "error",
                        "message": "error: 𐀀 test"}, 0)
     assert entry.message is not None
+
+
+def test_timestamp_bool_not_confused():
+    """布尔值不应被误解为 Unix 时间戳"""
+    entry = normalize({"source": "x", "level": "error",
+                       "message": "fail", "timestamp": True}, 0)
+    assert entry.timestamp is None, "True 不应被解析为时间戳"
+    assert entry.is_dirty
+
+
+def test_numeric_message_accepted():
+    """数值类型的消息应被接受，而非丢弃"""
+    entry = normalize({"source": "x", "level": "error",
+                       "message": 500}, 0)
+    assert entry.message == "500", f"期望 '500', 实际 '{entry.message}'"
+
+    entry2 = normalize({"source": "x", "level": "error",
+                        "error": 503, "timestamp": "2024-01-01T00:00:00Z"}, 0)
+    assert entry2.message == "503", f"期望 '503', 实际 '{entry2.message}'"
+
+
+def test_timestamp_bool_false_skipped():
+    """False 不应被解析为时间戳（即使它是 int 子类）"""
+    ts = extract_timestamp({"timestamp": False})
+    assert ts is None, "False 不应被解析"
+

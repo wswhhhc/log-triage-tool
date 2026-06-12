@@ -39,6 +39,9 @@ def init_db():
     conn = get_conn()
     c = conn.cursor()
 
+    # 启用 WAL 模式：允许读写并发，提升大文件处理时的响应速度
+    c.execute("PRAGMA journal_mode=WAL")
+
     c.execute("""
         CREATE TABLE IF NOT EXISTS logs (
             id TEXT PRIMARY KEY,

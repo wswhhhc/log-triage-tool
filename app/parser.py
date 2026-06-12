@@ -38,7 +38,8 @@ def parse_jsonl(file_path: str) -> Tuple[List[dict], List[dict]]:
         return valid_logs, dirty_data  # 空文件直接返回
 
     # 3. 逐行解析
-    with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+    with open(file_path, 'r', encoding='utf-8-sig', errors='replace') as f:
+        # 注意: utf-8-sig 会自动去除 UTF-8 BOM (﻿)，避免第一行因 BOM 导致 JSON 解析失败
         for line_num, line in enumerate(f, 1):
             # 行数限制
             if line_num > MAX_LINES:

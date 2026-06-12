@@ -119,3 +119,18 @@ def test_parse_max_line_limit():
         assert any("超过最大行数" in d["reason"] for d in dirty)
 
     os.unlink(f.name)
+
+
+def test_parse_bom_first_line():
+    """UTF-8 BOM 首行不应导致解析失败"""
+    with tempfile.NamedTemporaryFile(mode='wb', suffix='.jsonl', delete=False) as f:
+        bom = b'\xef\xbb\xbf'
+        f.write(bom + b'{"level":"error","message":"first"}\n')
+        f.write(b'{"level":"info","message":"second"}\n')
+        f.close()
+
+        logs, dirty = parse_jsonl(f.name)
+        assert len(logs) == 2, f"期望 2 条合法日志, 实际 {len(logs)}"
+        assert len(dirty) == 0, f"不应有脏数据: {dirty}"
+
+    os.unlink(f.name)
